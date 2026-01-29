@@ -1,5 +1,6 @@
 import { CopilotRuntime } from "../runtime";
 import { EventType } from "@ag-ui/client";
+import { CONNECT_ABORTERS_BY_THREAD } from "./connect-aborters";
 
 interface StopAgentParameters {
   request: Request;
@@ -28,6 +29,18 @@ export async function handleStopAgent({
           headers: { "Content-Type": "application/json" },
         }
       );
+    }
+
+    const connectKey = `${agentId}:${threadId}`;
+    const aborters = CONNECT_ABORTERS_BY_THREAD.get(connectKey);
+    if (aborters && aborters.size > 0) {
+      for (const aborter of Array.from(aborters)) {
+        try {
+          aborter();
+        } catch {
+          // ignore abort errors
+        }
+      }
     }
 
     const stopped = await runtime.runner.stop({ threadId });

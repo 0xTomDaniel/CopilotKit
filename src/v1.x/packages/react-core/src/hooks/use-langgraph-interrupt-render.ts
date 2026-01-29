@@ -58,6 +58,12 @@ export function useLangGraphInterruptRender(
       onRunStartedEvent: () => {
         localInterrupt = null;
       },
+      onRunFinishedEvent: () => {
+        if (localInterrupt) {
+          addInterruptEvent(localInterrupt);
+          localInterrupt = null;
+        }
+      },
       onRunFinalized: () => {
         if (localInterrupt) {
           addInterruptEvent(localInterrupt);

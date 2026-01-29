@@ -5,6 +5,7 @@ import {
   RunAgentInputSchema,
 } from "@ag-ui/client";
 import { EventEncoder } from "@ag-ui/encoder";
+import { type Subscription } from "rxjs";
 import { CopilotRuntime } from "../runtime";
 import { extractForwardableHeaders } from "./header-utils";
 
@@ -42,7 +43,7 @@ export async function handleRunAgent({
     if (agent && "headers" in agent) {
       const forwardableHeaders = extractForwardableHeaders(request);
       agent.headers = {
-        ...agent.headers as Record<string, string>,
+        ...(agent.headers as Record<string, string>),
         ...forwardableHeaders
       };
     }
@@ -51,6 +52,26 @@ export async function handleRunAgent({
     const writer = stream.writable.getWriter();
     const encoder = new EventEncoder();
     let streamClosed = false;
+    let subscription: Subscription | undefined;
+
+    const abortHandler = () => {
+      if (streamClosed) {
+        return;
+      }
+      streamClosed = true;
+      if (subscription) {
+        try {
+          subscription.unsubscribe();
+        } catch {
+          // ignore unsubscribe errors
+        }
+      }
+      try {
+        writer.close();
+      } catch {
+        // Stream already closed
+      }
+    };
 
     // Process the request in the background
     (async () => {
@@ -71,7 +92,7 @@ export async function handleRunAgent({
       agent.setState(input.state);
       agent.threadId = input.threadId;
 
-      runtime.runner
+      subscription = runtime.runner
         .run({
           threadId: input.threadId,
           agent,
@@ -84,7 +105,7 @@ export async function handleRunAgent({
                 await writer.write(encoder.encode(event));
               } catch (error) {
                 if (error instanceof Error && error.name === 'AbortError') {
-                  streamClosed = true;
+                  abortHandler();
                 }
               }
             }

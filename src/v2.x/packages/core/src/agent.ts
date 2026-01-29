@@ -46,6 +46,7 @@ export class ProxiedCopilotRuntimeAgent extends HttpAgent {
   }
 
   abortRun(): void {
+    super.abortRun();
     if (!this.agentId || !this.threadId) {
       return;
     }
